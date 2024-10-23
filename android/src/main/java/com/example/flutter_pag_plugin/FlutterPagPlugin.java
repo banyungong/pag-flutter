@@ -40,10 +40,10 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     Context context;
     io.flutter.plugin.common.PluginRegistry.Registrar registrar;
     FlutterPlugin.FlutterAssets flutterAssets;
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     // 多引擎使用是plugin的集合，请留意该场景下需手动释放，否则存在内存泄漏的问题
-    public static List<FlutterPagPlugin> pluginList = new ArrayList<FlutterPagPlugin>();
+//    public static List<FlutterPagPlugin> pluginList = new ArrayList<FlutterPagPlugin>();
 
     public HashMap<String, FlutterPagPlayer> layerMap = new HashMap<String, FlutterPagPlayer>();
     public HashMap<String, TextureRegistry.SurfaceTextureEntry> entryMap = new HashMap<String, TextureRegistry.SurfaceTextureEntry>();
@@ -86,7 +86,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     }
 
     public FlutterPagPlugin(io.flutter.plugin.common.PluginRegistry.Registrar registrar) {
-        pluginList.add(this);
+//        pluginList.add(this);
         this.registrar = registrar;
         textureRegistry = registrar.textures();
         context = registrar.context();
@@ -95,9 +95,9 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
-        if (!pluginList.contains(this)) {
-            pluginList.add(this);
-        }
+//        if (!pluginList.contains(this)) {
+//            pluginList.add(this);
+//        }
         flutterAssets = binding.getFlutterAssets();
         channel = new MethodChannel(binding.getBinaryMessenger(), "flutter_pag_plugin");
         channel.setMethodCallHandler(this);
@@ -112,7 +112,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
             @Override
             public boolean onViewDestroy(FlutterNativeView flutterNativeView) {
                 plugin.onDestroy();
-                pluginList.remove(this);
+//                pluginList.remove(this);
                 return false; // We are not interested in assuming ownership of the NativeView.
             }
         });
