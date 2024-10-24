@@ -341,5 +341,6 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
         channel.setMethodCallHandler(null);
+        onDestroy();
     }
 }
