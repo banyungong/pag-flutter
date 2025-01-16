@@ -118,7 +118,7 @@
 }
 
 - (void)initPag:(id)arguments result:(FlutterResult _Nonnull)result {
-    if (arguments == nil || (arguments[@"assetName"] == NSNull.null && arguments[@"url"] == NSNull.null && arguments[@"bytesData"] == NSNull.null)) {
+    if (arguments == nil || (arguments[@"assetName"] == NSNull.null && arguments[@"url"] == NSNull.null && arguments[@"bytesData"] == NSNull.null&&arguments[@"filePath"] == NSNull.null)) {
         result(@-1);
         NSLog(@"showPag arguments is nil");
         return;
@@ -159,6 +159,16 @@
         }
         [self pagRenderWithPagData:pagData progress:initProgress repeatCount:repeatCount autoPlay:autoPlay result:result];
     }
+    
+    NSString* filePath = arguments[@"filePath"];
+    if ([filePath isKindOfClass:NSString.class] && filePath.length > 0) {
+        NSString *key = assetName;
+        if (!pagData) {
+            pagData = [NSData dataWithContentsOfFile:filePath];
+        }
+        [self pagRenderWithPagData:pagData progress:initProgress repeatCount:repeatCount autoPlay:autoPlay result:result];
+    }
+    
     NSString* url = arguments[@"url"];
     if ([url isKindOfClass:NSString.class] && url.length > 0) {
         NSURLSessionDownloadTask *task;

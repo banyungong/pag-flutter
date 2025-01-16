@@ -62,6 +62,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     final static String _argumentAssetName = "assetName";
     final static String _argumentPackage = "package";
     final static String _argumentUrl = "url";
+    final static String _argumentFilePath = "filePath";
     final static String _argumentBytes = "bytesData";
     final static String _argumentRepeatCount = "repeatCount";
     final static String _argumentInitProgress = "initProgress";
@@ -157,6 +158,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         String assetName = call.argument(_argumentAssetName);
         byte[] bytes = call.argument(_argumentBytes);
         String url = call.argument(_argumentUrl);
+        String filePath = call.argument(_argumentFilePath);
         String flutterPackage = call.argument(_argumentPackage);
 
         if (bytes != null) {
@@ -177,12 +179,10 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
                     assetKey = flutterAssets.getAssetFilePathByName(assetName, flutterPackage);
                 }
             }
-
             if (assetKey == null) {
                 result.error("-1100", "asset资源加载错误", null);
                 return;
             }
-
             PAGFile composition = PAGFile.Load(context.getAssets(), assetKey);
             initPagPlayerAndCallback(composition, call, result);
         } else if (url != null) {
@@ -204,6 +204,9 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
                     return null;
                 }
             }, DataLoadHelper.FROM_PLUGIN);
+        } else if (filePath != null && !filePath.isEmpty()) {
+            PAGFile composition = PAGFile.Load(filePath);
+            initPagPlayerAndCallback(composition, call, result);
         } else {
             result.error("-1100", "未添加资源", null);
         }

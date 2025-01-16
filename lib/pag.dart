@@ -4,47 +4,50 @@ import 'package:flutter/services.dart';
 typedef PAGCallback = void Function();
 
 class PAGView extends StatefulWidget {
-  double? width;
-  double? height;
+  final double? width;
+  final double? height;
 
   /// 二进制动画数据
-  Uint8List? bytesData;
+  final Uint8List? bytesData;
 
   /// 网络资源，动画链接
-  String? url;
+  final String? url;
 
   /// flutter动画资源路径
-  String? assetName;
+  final String? assetName;
+
+  /// 文件资源
+  final String? filePath;
 
   /// asset package
-  String? package;
+  final String? package;
 
   /// 初始化时播放进度
-  double initProgress;
+  final double initProgress;
 
   /// 初始化后自动播放
-  bool autoPlay;
+  final bool autoPlay;
 
   /// 循环次数
-  int repeatCount;
+  final int repeatCount;
 
   /// 初始化完成
-  PAGCallback? onInit;
+  final PAGCallback? onInit;
 
   /// Notifies the start of the animation.
-  PAGCallback? onAnimationStart;
+  final PAGCallback? onAnimationStart;
 
   /// Notifies the end of the animation.
-  PAGCallback? onAnimationEnd;
+  final PAGCallback? onAnimationEnd;
 
   /// Notifies the cancellation of the animation.
-  PAGCallback? onAnimationCancel;
+  final PAGCallback? onAnimationCancel;
 
   /// Notifies the repetition of the animation.
-  PAGCallback? onAnimationRepeat;
+  final PAGCallback? onAnimationRepeat;
 
   /// 加载失败时的默认控件构造器
-  Widget Function(BuildContext context)? defaultBuilder;
+  final Widget Function(BuildContext context)? defaultBuilder;
 
   static const int REPEAT_COUNT_LOOP = -1; //无限循环
   static const int REPEAT_COUNT_DEFAULT = 1; //默认仅播放一次
@@ -63,6 +66,10 @@ class PAGView extends StatefulWidget {
     this.onAnimationRepeat,
     this.defaultBuilder,
     Key? key,
+    this.bytesData = null,
+    this.assetName = null,
+    this.filePath = null,
+    this.package = null,
   }) : super(key: key);
 
   PAGView.asset(
@@ -80,8 +87,12 @@ class PAGView extends StatefulWidget {
     this.onAnimationRepeat,
     this.defaultBuilder,
     Key? key,
+    this.bytesData,
+    this.url,
+    this.filePath,
   }) : super(key: key);
 
+  @Deprecated('')
   PAGView.bytes(
     this.bytesData, {
     this.width,
@@ -97,6 +108,29 @@ class PAGView extends StatefulWidget {
     this.onAnimationRepeat,
     this.defaultBuilder,
     Key? key,
+    this.url,
+    this.assetName,
+    this.filePath,
+  }) : super(key: key);
+
+  PAGView.filePath(
+    this.filePath, {
+    this.width,
+    this.height,
+    this.repeatCount = REPEAT_COUNT_DEFAULT,
+    this.initProgress = 0,
+    this.autoPlay = false,
+    this.package,
+    this.onInit,
+    this.onAnimationStart,
+    this.onAnimationEnd,
+    this.onAnimationCancel,
+    this.onAnimationRepeat,
+    this.defaultBuilder,
+    Key? key,
+    this.url,
+    this.assetName,
+    this.bytesData,
   }) : super(key: key);
 
   @override
@@ -125,6 +159,7 @@ class PAGViewState extends State<PAGView> {
   static const String _argumentPackage = 'package';
   static const String _argumentUrl = 'url';
   static const String _argumentBytes = 'bytesData';
+  static const String _argumentFilePath = "filePath";
   static const String _argumentRepeatCount = 'repeatCount';
   static const String _argumentInitProgress = 'initProgress';
   static const String _argumentAutoPlay = 'autoPlay';
@@ -163,11 +198,22 @@ class PAGViewState extends State<PAGView> {
 
   // 初始化
   void newTexture() async {
-    int repeatCount = widget.repeatCount <= 0 && widget.repeatCount != PAGView.REPEAT_COUNT_LOOP ? PAGView.REPEAT_COUNT_DEFAULT : widget.repeatCount;
+    int repeatCount = widget.repeatCount <= 0 && widget.repeatCount != PAGView.REPEAT_COUNT_LOOP
+        ? PAGView.REPEAT_COUNT_DEFAULT
+        : widget.repeatCount;
     double initProcess = widget.initProgress < 0 ? 0 : widget.initProgress;
 
     try {
-      dynamic result = await _channel.invokeMethod(_nativeInit, {_argumentAssetName: widget.assetName, _argumentPackage: widget.package, _argumentUrl: widget.url, _argumentBytes: widget.bytesData, _argumentRepeatCount: repeatCount, _argumentInitProgress: initProcess, _argumentAutoPlay: widget.autoPlay});
+      dynamic result = await _channel.invokeMethod(_nativeInit, {
+        _argumentAssetName: widget.assetName,
+        _argumentPackage: widget.package,
+        _argumentUrl: widget.url,
+        _argumentFilePath: widget.filePath,
+        _argumentBytes: widget.bytesData,
+        _argumentRepeatCount: repeatCount,
+        _argumentInitProgress: initProcess,
+        _argumentAutoPlay: widget.autoPlay
+      });
       if (result is Map) {
         _textureId = result[_argumentTextureId];
         rawWidth = result[_argumentWidth] ?? 0;
@@ -236,7 +282,10 @@ class PAGViewState extends State<PAGView> {
     if (!_hasLoadTexture) {
       return [];
     }
-    return (await _channel.invokeMethod(_nativeGetPointLayer, {_argumentTextureId: _textureId, _argumentPointX: x, _argumentPointY: y}) as List).map((e) => e.toString()).toList();
+    return (await _channel.invokeMethod(
+            _nativeGetPointLayer, {_argumentTextureId: _textureId, _argumentPointX: x, _argumentPointY: y}) as List)
+        .map((e) => e.toString())
+        .toList();
   }
 
   @override
