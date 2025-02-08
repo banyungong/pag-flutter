@@ -260,7 +260,7 @@
     if (!_cache) {
         _cache = [[NSCache alloc] init];
         ///缓存64m
-        _cache.totalCostLimit = 64*1024*1024;
+        _cache.totalCostLimit = 24*1024*1024;
         _cache.countLimit = 32;
     }
     return _cache;

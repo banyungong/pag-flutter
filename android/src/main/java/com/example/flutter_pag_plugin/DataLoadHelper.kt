@@ -15,7 +15,7 @@ import java.security.NoSuchAlgorithmException
 //数据加载器
 object DataLoadHelper {
     private var diskCache: DiskLruCache? = null
-    private val memoryCache by lazy { LruCache<String, ByteArray>(Runtime.getRuntime().maxMemory().toInt() / 50) }
+    private val memoryCache by lazy { LruCache<String, ByteArray>(Runtime.getRuntime().maxMemory().toInt() / 100) }
     private const val TAG = "DataLoadHelper"
     const val DEFAULT_DIS_SIZE = 30 * 1024 * 1024L;
 
