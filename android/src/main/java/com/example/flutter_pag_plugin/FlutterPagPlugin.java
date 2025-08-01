@@ -8,6 +8,8 @@ import android.view.Surface;
 
 import androidx.annotation.NonNull;
 
+import com.example.flutter_pag_plugin.platfromview.PagFactory;
+
 import org.libpag.PAGFile;
 import org.libpag.PAGLayer;
 import org.libpag.PAGSurface;
@@ -91,6 +93,12 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         context = binding.getApplicationContext();
         textureRegistry = binding.getTextureRegistry();
         DataLoadHelper.INSTANCE.initDiskCache(context, DataLoadHelper.INSTANCE.DEFAULT_DIS_SIZE);
+        
+        // 注册Platform View
+        binding.getPlatformViewRegistry().registerViewFactory(
+            "flutter_pag_platform_view", 
+            new PagFactory(binding.getBinaryMessenger())
+        );
     }
 
     @Override

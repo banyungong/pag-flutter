@@ -80,6 +80,7 @@ class _MyHomeState extends State<MyHome> {
                 child: PAGView.asset(
                   _pagAsset,
                   repeatCount: PAGView.REPEAT_COUNT_LOOP,
+                  renderMode: PAGRenderMode.platformView,
                   initProgress: 0.25,
                   autoPlay: true,
                   key: assetPagKey,
@@ -125,8 +126,8 @@ class _MyHomeState extends State<MyHome> {
                   ],
                 ),
               ),
-
-              /// TODO: PAGView加载网络资源
+              //
+              // /// TODO: PAGView加载网络资源
               Padding(
                 padding: EdgeInsets.only(top: 50, left: 12, bottom: 20),
                 child: Text(
@@ -136,6 +137,7 @@ class _MyHomeState extends State<MyHome> {
               ),
               PAGView.network(
                 "https://svipwebwx-30096.sz.gfp.tencent-cloud.com/file1647585475981.pag",
+                renderMode: PAGRenderMode.platformView,
                 repeatCount: PAGView.REPEAT_COUNT_LOOP,
                 initProgress: 0.25,
                 autoPlay: true,
@@ -188,6 +190,7 @@ class _MyHomeState extends State<MyHome> {
                   child: PAGView.bytes(
                     bytesData,
                     repeatCount: PAGView.REPEAT_COUNT_LOOP,
+                    renderMode: PAGRenderMode.platformView,
                     initProgress: 0.25,
                     autoPlay: true,
                     key: bytesPagKey,
@@ -241,6 +244,7 @@ class _MyHomeState extends State<MyHome> {
                 child: PAGView.asset(
                   _assetError,
                   repeatCount: PAGView.REPEAT_COUNT_LOOP,
+                  renderMode: PAGRenderMode.platformView,
                   initProgress: 0.25,
                   autoPlay: true,
                   defaultBuilder: (context){
@@ -253,6 +257,72 @@ class _MyHomeState extends State<MyHome> {
                   },
                 ),
               ),
+
+              /// TODO: 渲染模式对比
+              Padding(
+                padding: EdgeInsets.only(top: 50, left: 12, bottom: 20),
+                child: Text(
+                  "渲染模式对比（Texture vs PlatformView）：",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black54),
+                ),
+              ),
+              Row(
+                children: [
+                  // Texture模式
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          "Texture模式（默认）",
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.blue),
+                        ),
+                        SizedBox(height: 8),
+                        Container(
+                          width: 120,
+                          height: 120,
+                          child: PAGView.asset(
+                            _assetFans,
+                            renderMode: PAGRenderMode.platformView,
+                            repeatCount: PAGView.REPEAT_COUNT_LOOP,
+                            autoPlay: true,
+                          ),
+                        ),
+                        Text(
+                          "性能更好",
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // PlatformView模式
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          "PlatformView模式",
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.green),
+                        ),
+                        SizedBox(height: 8),
+                        Container(
+                          width: 120,
+                          height: 120,
+                          child: PAGView.asset(
+                            _assetFans,
+                            renderMode: PAGRenderMode.platformView,
+                            repeatCount: PAGView.REPEAT_COUNT_LOOP,
+                            autoPlay: true,
+                          ),
+                        ),
+                        Text(
+                          "更好的原生集成",
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
             ],
           ),
         ));

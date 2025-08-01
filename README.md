@@ -48,6 +48,35 @@ PAGView.bytes(
     key: pagKey,  // 利用key进行主动调用
     autoPlay: true, // 是否自动播放
   )
+
+### 选择渲染模式
+从版本1.1.0开始，支持两种渲染模式：
+
+#### Texture模式（默认，推荐）
+```dart
+PAGView.asset(
+    "assets/xxx.pag",
+    renderMode: PAGRenderMode.texture, // Texture模式
+    repeatCount: PAGView.REPEAT_COUNT_LOOP,
+    autoPlay: true,
+  )
+```
+- **优点**: 性能更好，渲染效率高
+- **适用场景**: 大多数使用场景，特别是性能要求较高的场合
+
+#### PlatformView模式
+```dart
+PAGView.asset(
+    "assets/xxx.pag", 
+    renderMode: PAGRenderMode.platformView, // PlatformView模式
+    repeatCount: PAGView.REPEAT_COUNT_LOOP,
+    autoPlay: true,
+  )
+```
+- **优点**: 更好的原生集成，支持原生交互
+- **缺点**: 性能略逊于Texture模式
+- **适用场景**: 需要复杂原生交互的场合
+- **注意**: 目前仅支持Android平台
 ```
 ### 可以在PAGView中加入回调参数
 以下回调与原生PAG监听对齐
