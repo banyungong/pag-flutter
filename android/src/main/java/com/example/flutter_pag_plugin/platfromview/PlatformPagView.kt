@@ -9,6 +9,7 @@ import android.opengl.EGLSurface
 import android.opengl.GLES20
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.widget.RelativeLayout
@@ -82,12 +83,15 @@ class PlatformPagView(
     }
 
     override fun getView(): View? {
+        Log.e("Pag Test","getView:${viewId}")
         return containerView
     }
 
     override fun dispose() {
+        Log.e("Pag Test","dispose:${viewId}")
         if (pagView != null) {
             pagView!!.freeCache()
+            pagView?.removeListener(this)
             onRelease()
         }
         methodChannel?.setMethodCallHandler(null)
