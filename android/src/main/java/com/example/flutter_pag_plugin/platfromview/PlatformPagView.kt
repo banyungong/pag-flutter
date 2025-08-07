@@ -1,12 +1,6 @@
 package com.example.flutter_pag_plugin.platfromview
 
 import android.content.Context
-import android.opengl.EGL14
-import android.opengl.EGLConfig
-import android.opengl.EGLContext
-import android.opengl.EGLDisplay
-import android.opengl.EGLSurface
-import android.opengl.GLES20
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -32,10 +26,6 @@ class PlatformPagView(
 
     private var pagView: PAGView? = null
     private var containerView: RelativeLayout? = null
-    private var eglDisplay: EGLDisplay? = null
-    private var eglSurface: EGLSurface? = null
-    private var eglContext: EGLContext? = null
-    private var textureID: Int = 0
     private var methodChannel: MethodChannel? = null
     private var pagFile: PAGFile? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -89,11 +79,14 @@ class PlatformPagView(
 
     override fun dispose() {
         Log.e("Pag Test","dispose:${viewId}")
-        if (pagView != null) {
-            pagView!!.freeCache()
+        
+        // 在主线程中安全释放
+        mainHandler.post {
+            pagView?.stop()
             pagView?.removeListener(this)
-            onRelease()
+            pagView = null
         }
+        
         methodChannel?.setMethodCallHandler(null)
         methodChannel = null
     }
@@ -209,65 +202,6 @@ class PlatformPagView(
         }
     }
 
-    private fun eglSetup() {
-        eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
-        val version = IntArray(2)
-        EGL14.eglInitialize(eglDisplay, version, 0, version, 1)
-        EGL14.eglBindAPI(EGL14.EGL_OPENGL_ES_API)
-        val attributeList = intArrayOf(
-            EGL14.EGL_RENDERABLE_TYPE,
-            EGL14.EGL_OPENGL_ES2_BIT,
-            EGL14.EGL_RED_SIZE,
-            8,
-            EGL14.EGL_GREEN_SIZE,
-            8,
-            EGL14.EGL_BLUE_SIZE,
-            8,
-            EGL14.EGL_ALPHA_SIZE,
-            8,
-            EGL14.EGL_STENCIL_SIZE,
-            8,
-            EGL14.EGL_SAMPLE_BUFFERS,
-            1,
-            EGL14.EGL_SAMPLES,
-            4,
-            EGL14.EGL_NONE
-        )
-        val configs = arrayOfNulls<EGLConfig>(1)
-        val numConfigs = IntArray(1)
-        EGL14.eglChooseConfig(eglDisplay, attributeList, 0, configs, 0, configs.size, numConfigs, 0)
-
-        val attribute_list = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE)
-        eglContext =
-            EGL14.eglCreateContext(eglDisplay, configs[0], EGL14.EGL_NO_CONTEXT, attribute_list, 0)
-        val surfaceAttributes = intArrayOf(EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE)
-        eglSurface = EGL14.eglCreatePbufferSurface(eglDisplay, configs[0], surfaceAttributes, 0)
-    }
-
-    private fun onRelease() {
-        val eglDisplayLocal = eglDisplay
-        val eglSurfaceLocal = eglSurface
-        val eglContextLocal = eglContext
-        
-        if (eglContextLocal != null && eglDisplayLocal != null && eglSurfaceLocal != null && 
-            EGL14.eglMakeCurrent(eglDisplayLocal, eglSurfaceLocal, eglSurfaceLocal, eglContextLocal)) {
-            if (textureID > 0) {
-                val textures = intArrayOf(textureID)
-                GLES20.glDeleteTextures(1, textures, 0)
-            }
-            EGL14.eglMakeCurrent(
-                eglDisplayLocal,
-                EGL14.EGL_NO_SURFACE,
-                EGL14.EGL_NO_SURFACE,
-                EGL14.EGL_NO_CONTEXT
-            )
-            EGL14.eglDestroySurface(eglDisplayLocal, eglSurfaceLocal)
-            EGL14.eglDestroyContext(eglDisplayLocal, eglContextLocal)
-            eglSurface = null
-            eglContext = null
-        }
-    }
-
     private fun addPAGViewAndPlay(
         composition: PAGFile,
         repeatCount: Int,
@@ -275,36 +209,33 @@ class PlatformPagView(
         autoPlay: Boolean
     ) {
         if (pagView == null) {
-            eglSetup()
-            val eglContextLocal = eglContext
-            if (eglContextLocal != null) {
-                pagView = PAGView(context, eglContextLocal)
-                pagView?.let { view ->
-                    view.addListener(this)
-                    view.layoutParams = RelativeLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    view.composition = composition
-                    view.setRepeatCount(repeatCount)
-                    view.progress = initProgress
-                    
-                    containerView?.addView(view)
-                    
-                    // 回传原始尺寸信息给Flutter端
-                    mainHandler.post {
-                        methodChannel?.invokeMethod(
-                            "onPAGViewInitialized", mapOf(
-                                "width" to composition.width().toDouble(),
-                                "height" to composition.height().toDouble(),
-                                "viewId" to viewId
-                            )
+            // 直接使用默认构造函数，让 PAGView 使用 Flutter 的 EGL Context
+            pagView = PAGView(context)
+            pagView?.let { view ->
+                view.addListener(this)
+                view.layoutParams = RelativeLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                view.composition = composition
+                view.setRepeatCount(repeatCount)
+                view.progress = initProgress
+                
+                containerView?.addView(view)
+                
+                // 回传原始尺寸信息给Flutter端
+                mainHandler.post {
+                    methodChannel?.invokeMethod(
+                        "onPAGViewInitialized", mapOf(
+                            "width" to composition.width().toDouble(),
+                            "height" to composition.height().toDouble(),
+                            "viewId" to viewId
                         )
-                    }
-                    
-                    if (autoPlay) {
-                        view.play()
-                    }
+                    )
+                }
+                
+                if (autoPlay) {
+                    view.play()
                 }
             }
         }
