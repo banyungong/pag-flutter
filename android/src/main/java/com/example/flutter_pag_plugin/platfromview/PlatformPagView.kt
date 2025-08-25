@@ -37,6 +37,13 @@ class PlatformPagView(
         const val _nativePause = "pause"
         const val _nativeSetProgress = "setProgress"
         const val _nativeGetPointLayer = "getLayersUnderPoint"
+        
+        // 新增：切换PAG文件的方法
+        const val _nativeLoadPagFile = "loadPagFile"
+        // 新增：隐藏/显示PAGView的方法
+        const val _nativeSetVisibility = "setVisibility"
+        // 新增：清空画面的方法（重置到第一帧或清空）
+        const val _nativeClearFrame = "clearFrame"
 
         const val _argumentAssetName = "assetName"
         const val _argumentPackage = "package"
@@ -49,6 +56,8 @@ class PlatformPagView(
         const val _argumentPointX = "x"
         const val _argumentPointY = "y"
         const val _argumentProgress = "progress"
+        // 新增：可见性参数
+        const val _argumentVisible = "visible"
 
         const val _playCallback = "PAGCallback"
         const val _eventStart = "onAnimationStart"
@@ -73,22 +82,24 @@ class PlatformPagView(
     }
 
     override fun getView(): View? {
-        Log.e("Pag Test","getView:${viewId}")
+        Log.d("PlatformPagView", "getView: viewId=$viewId")
         return containerView
     }
 
     override fun dispose() {
-        Log.e("Pag Test","dispose:${viewId}")
+        Log.d("PlatformPagView", "dispose: viewId=$viewId")
         
-        // 在主线程中安全释放
         mainHandler.post {
+            pagView?.pause()
             pagView?.stop()
             pagView?.removeListener(this)
-            pagView = null
+            
+            // 清理PAG文件引用
+            pagFile = null
+            
+            methodChannel?.setMethodCallHandler(null)
+            methodChannel = null
         }
-        
-        methodChannel?.setMethodCallHandler(null)
-        methodChannel = null
     }
 
     private fun parseCreationParams() {
@@ -104,9 +115,12 @@ class PlatformPagView(
             val initProgress = params[_argumentInitProgress] as? Double ?: 0.0
             val autoPlay = params[_argumentAutoPlay] as? Boolean ?: false
 
+            // 先创建PAGView，然后加载PAG文件
+            createPAGViewIfNeeded()
+            
             when {
                 bytes != null -> {
-                    initPagFile(PAGFile.Load(bytes), repeatCount, initProgress, autoPlay)
+                    loadPagFile(PAGFile.Load(bytes), repeatCount, initProgress, autoPlay)
                 }
 
                 assetName != null -> {
@@ -118,8 +132,26 @@ class PlatformPagView(
                 }
 
                 filePath != null -> {
-                    initPagFile(PAGFile.Load(filePath), repeatCount, initProgress, autoPlay)
+                    loadPagFile(PAGFile.Load(filePath), repeatCount, initProgress, autoPlay)
                 }
+            }
+        }
+    }
+
+    /**
+     * 创建PAGView（如果还没有创建的话）
+     */
+    private fun createPAGViewIfNeeded() {
+        if (pagView == null) {
+            pagView = PAGView(context)
+            pagView?.let { view ->
+                view.addListener(this)
+                view.layoutParams = RelativeLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                containerView?.addView(view)
+                Log.d("PlatformPagView", "PAGView created for viewId=$viewId")
             }
         }
     }
@@ -139,9 +171,9 @@ class PlatformPagView(
             }
             
             val composition = PAGFile.Load(context.assets, assetPath)
-            initPagFile(composition, repeatCount, initProgress, autoPlay)
+            loadPagFile(composition, repeatCount, initProgress, autoPlay)
         } catch (e: IOException) {
-            e.printStackTrace()
+            Log.e("PlatformPagView", "Failed to load asset: $assetName", e)
         }
     }
     
@@ -153,21 +185,60 @@ class PlatformPagView(
     ) {
         DataLoadHelper.loadPag(url, { bytes ->
             if (bytes != null) {
-                initPagFile(PAGFile.Load(bytes), repeatCount, initProgress, autoPlay)
+                loadPagFile(PAGFile.Load(bytes), repeatCount, initProgress, autoPlay)
+            } else {
+                Log.e("PlatformPagView", "Failed to load PAG from URL: $url")
             }
         }, DataLoadHelper.FROM_PLUGIN)
     }
     
-    private fun initPagFile(
+    /**
+     * 加载新的PAG文件到现有的PAGView中
+     */
+    private fun loadPagFile(
         composition: PAGFile?,
         repeatCount: Int,
         initProgress: Double,
         autoPlay: Boolean
     ) {
-        if (composition == null) return
+        if (composition == null) {
+            Log.e("PlatformPagView", "PAG composition is null")
+            return
+        }
         
+        // 确保PAGView已创建
+        createPAGViewIfNeeded()
+        
+        // 停止当前播放
+        pagView?.stop()
+        
+        // 设置新的composition
         this.pagFile = composition
-        addPAGViewAndPlay(composition, repeatCount, initProgress, autoPlay)
+        pagView?.let { view ->
+            view.composition = composition
+            view.setRepeatCount(repeatCount)
+            view.progress = initProgress
+            
+            // 显示PAGView（加载新文件时默认显示）
+            view.visibility = View.VISIBLE
+            
+            // 回传尺寸信息给Flutter端
+            mainHandler.post {
+                methodChannel?.invokeMethod(
+                    "onPAGViewInitialized", mapOf(
+                        "width" to composition.width().toDouble(),
+                        "height" to composition.height().toDouble(),
+                        "viewId" to viewId
+                    )
+                )
+            }
+            
+            if (autoPlay) {
+                view.play()
+            }
+            
+            Log.d("PlatformPagView", "PAG file loaded successfully for viewId=$viewId, size=${composition.width()}x${composition.height()}")
+        }
     }
     
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -196,47 +267,91 @@ class PlatformPagView(
                 val layerNames = layers?.map { it.layerName() } ?: emptyList()
                 result.success(layerNames)
             }
+            // 新增：动态加载PAG文件
+            _nativeLoadPagFile -> {
+                loadPagFileFromMethodCall(call, result)
+            }
+            // 新增：设置可见性
+            _nativeSetVisibility -> {
+                val visible = call.argument<Boolean>(_argumentVisible) ?: true
+                setViewVisibility(visible)
+                result.success(null)
+            }
+            // 新增：清空画面
+            _nativeClearFrame -> {
+                clearFrame()
+                result.success(null)
+            }
             else -> {
                 result.notImplemented()
             }
         }
     }
 
-    private fun addPAGViewAndPlay(
-        composition: PAGFile,
-        repeatCount: Int,
-        initProgress: Double,
-        autoPlay: Boolean
-    ) {
-        if (pagView == null) {
-            // 直接使用默认构造函数，让 PAGView 使用 Flutter 的 EGL Context
-            pagView = PAGView(context)
+    /**
+     * 处理动态加载PAG文件的方法调用
+     */
+    private fun loadPagFileFromMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        Log.d("PlatformPagView", "loadPagFileFromMethodCall: viewId=$viewId")
+
+        val assetName = call.argument<String>(_argumentAssetName)
+        val bytes = call.argument<ByteArray>(_argumentBytes)
+        val url = call.argument<String>(_argumentUrl)
+        val filePath = call.argument<String>(_argumentFilePath)
+        val flutterPackage = call.argument<String>(_argumentPackage)
+        val repeatCount = call.argument<Int>(_argumentRepeatCount) ?: 0
+        val initProgress = call.argument<Double>(_argumentInitProgress) ?: 0.0
+        val autoPlay = call.argument<Boolean>(_argumentAutoPlay) ?: false
+
+        when {
+            bytes != null -> {
+                loadPagFile(PAGFile.Load(bytes), repeatCount, initProgress, autoPlay)
+                result.success(null)
+            }
+
+            assetName != null -> {
+                loadFromAsset(assetName, flutterPackage, repeatCount, initProgress, autoPlay)
+                result.success(null)
+            }
+
+            url != null -> {
+                loadFromUrl(url, repeatCount, initProgress, autoPlay)
+                result.success(null)
+            }
+
+            filePath != null -> {
+                loadPagFile(PAGFile.Load(filePath), repeatCount, initProgress, autoPlay)
+                result.success(null)
+            }
+
+            else -> {
+                result.error("INVALID_ARGUMENTS", "No valid PAG source provided", null)
+            }
+        }
+    }
+
+    /**
+     * 设置PAGView的可见性
+     */
+    private fun setViewVisibility(visible: Boolean) {
+        mainHandler.post {
+            pagView?.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+//            Log.d("PlatformPagView", "PAGView visibility set to: ${if (visible) "VISIBLE" : "INVISIBLE"} for viewId=$viewId")
+        }
+    }
+
+    /**
+     * 清空画面 - 停止播放并重置到第一帧或隐藏
+     */
+    private fun clearFrame() {
+        mainHandler.post {
             pagView?.let { view ->
-                view.addListener(this)
-                view.layoutParams = RelativeLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                view.composition = composition
-                view.setRepeatCount(repeatCount)
-                view.progress = initProgress
-                
-                containerView?.addView(view)
-                
-                // 回传原始尺寸信息给Flutter端
-                mainHandler.post {
-                    methodChannel?.invokeMethod(
-                        "onPAGViewInitialized", mapOf(
-                            "width" to composition.width().toDouble(),
-                            "height" to composition.height().toDouble(),
-                            "viewId" to viewId
-                        )
-                    )
-                }
-                
-                if (autoPlay) {
-                    view.play()
-                }
+                view.stop()
+                // 重置到第一帧
+                view.progress = 0.0
+                // 强制刷新画面
+                view.flush()
+                Log.d("PlatformPagView", "Frame cleared for viewId=$viewId")
             }
         }
     }
@@ -296,4 +411,3 @@ class PlatformPagView(
         }
     }
 }
-

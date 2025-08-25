@@ -94,6 +94,14 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         textureRegistry = binding.getTextureRegistry();
         DataLoadHelper.INSTANCE.initDiskCache(context, DataLoadHelper.INSTANCE.DEFAULT_DIS_SIZE);
         
+        // 初始化简单的 Flutter 崩溃修复方案
+        try {
+            com.example.flutter_pag_plugin.utils.SimpleFlutterFix.INSTANCE.init();
+            android.util.Log.i("FlutterPagPlugin", "Simple Flutter fix initialized successfully");
+        } catch (Exception e) {
+            android.util.Log.e("FlutterPagPlugin", "Simple Flutter fix initialization failed: " + e.getMessage(), e);
+        }
+        
         // 注册Platform View
         binding.getPlatformViewRegistry().registerViewFactory(
             "flutter_pag_platform_view", 
@@ -209,13 +217,10 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         final Surface surface = new Surface(surfaceTexture);
         final PAGSurface pagSurface = PAGSurface.FromSurface(surface);
         pagPlayer.setSurface(pagSurface);
-        pagPlayer.setReleaseListener(new FlutterPagPlayer.ReleaseListener() {
-            @Override
-            public void onRelease() {
-                entry.release();
-                surface.release();
-                pagSurface.release();
-            }
+        pagPlayer.setReleaseListener(() -> {
+            entry.release();
+            surface.release();
+            pagSurface.release();
         });
 
         layerMap.put(String.valueOf(entry.id()), pagPlayer);
@@ -223,15 +228,12 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         callback.put(_argumentTextureId, entry.id());
         callback.put(_argumentWidth, (double) composition.width());
         callback.put(_argumentHeight, (double) composition.height());
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                pagPlayer.flush();
-                if (autoPlay) {
-                    pagPlayer.start();
-                }
-                result.success(callback);
+        handler.post(() -> {
+            pagPlayer.flush();
+            if (autoPlay) {
+                pagPlayer.start();
             }
+            result.success(callback);
         });
     }
 
@@ -280,7 +282,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     List<String> getLayersUnderPoint(MethodCall call) {
         FlutterPagPlayer flutterPagPlayer = getFlutterPagPlayer(call);
 
-        List<String> layerNames = new ArrayList();
+        List<String> layerNames = new ArrayList<>();
         PAGLayer[] layers = null;
         if (flutterPagPlayer != null) {
             layers = flutterPagPlayer.getLayersUnderPoint(

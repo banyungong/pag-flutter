@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -8,6 +10,7 @@ typedef PAGCallback = void Function();
 enum PAGRenderMode {
   /// 使用Texture渲染（默认，性能更好）
   texture,
+
   /// 使用PlatformView渲染（更好的原生集成）
   platformView,
 }
@@ -40,7 +43,7 @@ class PAGView extends StatefulWidget {
   /// 循环次数
   final int repeatCount;
 
-  /// 渲染模式
+  /// 渲染模式 iOS下PlatformView模式不可用
   final PAGRenderMode renderMode;
 
   /// 初始化完成
@@ -156,13 +159,14 @@ class PAGView extends StatefulWidget {
 class PAGViewState extends State<PAGView> {
   bool _hasLoadTexture = false;
   int _textureId = -1;
-  
+
   // PlatformView相关
   int? _platformViewId;
   MethodChannel? _platformViewChannel;
 
   double rawWidth = 0;
   double rawHeight = 0;
+
   // PlatformView模式下的原始尺寸
   double platformViewRawWidth = 0;
   double platformViewRawHeight = 0;
@@ -175,6 +179,11 @@ class PAGViewState extends State<PAGView> {
   static const String _nativePause = 'pause';
   static const String _nativeSetProgress = 'setProgress';
   static const String _nativeGetPointLayer = 'getLayersUnderPoint';
+
+  // 新增：PlatformView专用接口
+  static const String _nativeLoadPagFile = 'loadPagFile';
+  static const String _nativeSetVisibility = 'setVisibility';
+  static const String _nativeClearFrame = 'clearFrame';
 
   // 参数
   static const String _argumentTextureId = 'textureId';
@@ -192,6 +201,9 @@ class PAGViewState extends State<PAGView> {
   static const String _argumentPointY = 'y';
   static const String _argumentProgress = 'progress';
   static const String _argumentEvent = 'PAGEvent';
+
+  // 新增：可见性参数
+  static const String _argumentVisible = 'visible';
 
   // 监听该函数
   static const String _playCallback = 'PAGCallback';
@@ -216,10 +228,9 @@ class PAGViewState extends State<PAGView> {
   @override
   void initState() {
     super.initState();
-    if (widget.renderMode == PAGRenderMode.texture) {
+    if (widget.renderMode == PAGRenderMode.texture || Platform.isIOS) {
       newTexture();
     } else {
-      // PlatformView模式会在build方法中创建
       setState(() {
         _hasLoadTexture = true;
       });
@@ -251,9 +262,8 @@ class PAGViewState extends State<PAGView> {
         rawHeight = result[_argumentHeight] ?? 0;
       }
       if (mounted) {
-        setState(() {
-          _hasLoadTexture = true;
-        });
+        _hasLoadTexture = true;
+        setState(() {});
         widget.onInit?.call();
       } else {
         _channel.invokeMethod(_nativeRelease, {_argumentTextureId: _textureId});
@@ -322,7 +332,7 @@ class PAGViewState extends State<PAGView> {
     if (!_hasLoadTexture) {
       return;
     }
-    if (widget.renderMode == PAGRenderMode.texture) {
+    if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
       _channel.invokeMethod(_nativeStart, {_argumentTextureId: _textureId});
     } else {
       _platformViewChannel?.invokeMethod(_nativeStart);
@@ -334,7 +344,7 @@ class PAGViewState extends State<PAGView> {
     if (!_hasLoadTexture) {
       return;
     }
-    if (widget.renderMode == PAGRenderMode.texture) {
+    if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
       _channel.invokeMethod(_nativeStop, {_argumentTextureId: _textureId});
     } else {
       _platformViewChannel?.invokeMethod(_nativeStop);
@@ -346,7 +356,7 @@ class PAGViewState extends State<PAGView> {
     if (!_hasLoadTexture) {
       return;
     }
-    if (widget.renderMode == PAGRenderMode.texture) {
+    if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
       _channel.invokeMethod(_nativePause, {_argumentTextureId: _textureId});
     } else {
       _platformViewChannel?.invokeMethod(_nativePause);
@@ -358,7 +368,7 @@ class PAGViewState extends State<PAGView> {
     if (!_hasLoadTexture) {
       return;
     }
-    if (widget.renderMode == PAGRenderMode.texture) {
+    if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
       _channel.invokeMethod(_nativeSetProgress, {_argumentTextureId: _textureId, _argumentProgress: progress});
     } else {
       _platformViewChannel?.invokeMethod(_nativeSetProgress, {_argumentProgress: progress});
@@ -370,22 +380,113 @@ class PAGViewState extends State<PAGView> {
     if (!_hasLoadTexture) {
       return [];
     }
-    if (widget.renderMode == PAGRenderMode.texture) {
+    if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
       return (await _channel.invokeMethod(
               _nativeGetPointLayer, {_argumentTextureId: _textureId, _argumentPointX: x, _argumentPointY: y}) as List)
           .map((e) => e.toString())
           .toList();
     } else {
-      final result = await _platformViewChannel?.invokeMethod(
-          _nativeGetPointLayer, {_argumentPointX: x, _argumentPointY: y});
+      final result =
+          await _platformViewChannel?.invokeMethod(_nativeGetPointLayer, {_argumentPointX: x, _argumentPointY: y});
       return (result as List?)?.map((e) => e.toString()).toList() ?? [];
+    }
+  }
+
+  /// 动态加载新的PAG文件（仅PlatformView模式支持）
+  Future<void> loadPagFile({
+    String? assetName,
+    String? package,
+    String? url,
+    String? filePath,
+    Uint8List? bytes,
+    int repeatCount = PAGView.REPEAT_COUNT_DEFAULT,
+    double initProgress = 0.0,
+    bool autoPlay = true,
+  }) async {
+    if (widget.renderMode != PAGRenderMode.platformView||Platform.isIOS) {
+      throw UnsupportedError('loadPagFile 只支持 PlatformView 模式');
+    }
+
+    if (!_hasLoadTexture) {
+      return;
+    }
+
+    await _platformViewChannel?.invokeMethod(_nativeLoadPagFile, {
+      if (assetName != null) _argumentAssetName: assetName,
+      if (package != null) _argumentPackage: package,
+      if (url != null) _argumentUrl: url,
+      if (filePath != null) _argumentFilePath: filePath,
+      if (bytes != null) _argumentBytes: bytes,
+      _argumentRepeatCount: repeatCount,
+      _argumentInitProgress: initProgress,
+      _argumentAutoPlay: autoPlay,
+    });
+  }
+
+  /// 设置可见性（仅PlatformView模式支持）
+  Future<void> setVisibility(bool visible) async {
+    if (widget.renderMode != PAGRenderMode.platformView||Platform.isIOS) {
+      throw UnsupportedError('setVisibility 只支持 PlatformView 模式');
+    }
+
+    if (!_hasLoadTexture) {
+      return;
+    }
+
+    await _platformViewChannel?.invokeMethod(_nativeSetVisibility, {
+      _argumentVisible: visible,
+    });
+  }
+
+  /// 隐藏动画视图（仅PlatformView模式支持）
+  Future<void> hide() async => setVisibility(false);
+
+  /// 显示动画视图（仅PlatformView模式支持）
+  Future<void> show() async => setVisibility(true);
+
+  /// 清空画面并重置到第一帧（仅PlatformView模式支持）
+  Future<void> clearFrame() async {
+    if (widget.renderMode != PAGRenderMode.platformView||Platform.isIOS) {
+      throw UnsupportedError('clearFrame 只支持 PlatformView 模式');
+    }
+
+    if (!_hasLoadTexture) {
+      return;
+    }
+
+    await _platformViewChannel?.invokeMethod(_nativeClearFrame);
+  }
+
+  /// 停止播放并隐藏（仅PlatformView模式支持）
+  Future<void> stopAndHide() async {
+    stop();
+    await hide();
+  }
+
+  /// 清空画面并隐藏（仅PlatformView模式支持）
+  Future<void> clearAndHide() async {
+    await clearFrame();
+    await hide();
+  }
+
+  ///释放资源
+  Future<void> release() async {
+    if (!_hasLoadTexture) {
+      return;
+    }
+    if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
+      await _channel.invokeMethod(_nativeRelease, {_argumentTextureId: _textureId});
+      callbackHandlers.remove(_textureId);
+    } else {
+      _platformViewChannel?.setMethodCallHandler(null);
+      _platformViewChannel = null;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_hasLoadTexture) {
-      if (widget.renderMode == PAGRenderMode.texture) {
+      if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
         return Container(
           width: widget.width ?? (rawWidth / 2),
           height: widget.height ?? (rawHeight / 2),
@@ -427,13 +528,20 @@ class PAGViewState extends State<PAGView> {
         creationParams: creationParams,
         creationParamsCodec: const StandardMessageCodec(),
       );
+    } else if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return UiKitView(
+        viewType: 'flutter_pag_platform_view',
+        onPlatformViewCreated: _onPlatformViewCreated,
+        creationParams: creationParams,
+        creationParamsCodec: const StandardMessageCodec(),
+      );
     }
-    
-    // iOS暂不支持PlatformView，回退到默认Builder
-    return widget.defaultBuilder?.call(context) ?? 
+
+    // 其他平台暂不支持PlatformView，回退到默认Builder
+    return widget.defaultBuilder?.call(context) ??
         Container(
           child: Center(
-            child: Text('iOS平台暂不支持PlatformView模式'),
+            child: Text('该平台暂不支持PlatformView模式'),
           ),
         );
   }
@@ -441,7 +549,7 @@ class PAGViewState extends State<PAGView> {
   @override
   void dispose() {
     super.dispose();
-    if (widget.renderMode == PAGRenderMode.texture) {
+    if (widget.renderMode == PAGRenderMode.texture||Platform.isIOS) {
       _channel.invokeMethod(_nativeRelease, {_argumentTextureId: _textureId});
       callbackHandlers.remove(_textureId);
     } else {
