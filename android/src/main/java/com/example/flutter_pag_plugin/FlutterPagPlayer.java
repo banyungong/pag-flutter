@@ -5,6 +5,9 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.view.animation.LinearInterpolator;
 
+import androidx.annotation.NonNull;
+
+import org.libpag.PAGComposition;
 import org.libpag.PAGFile;
 import org.libpag.PAGPlayer;
 import org.libpag.PAGView;
@@ -37,6 +40,7 @@ public class FlutterPagPlayer extends PAGPlayer {
     }
 
     private void initAnimator(int repeatCount) {
+        ValueAnimator.setFrameDelay(33); // 设置帧率为约30fps（1000ms/30 ≈ 33ms）
         animator.setDuration(duration() / 1000L);
         animator.setInterpolator(new LinearInterpolator());
         animator.addUpdateListener(animatorUpdateListener);
@@ -70,34 +74,42 @@ public class FlutterPagPlayer extends PAGPlayer {
     }
 
     @Override
+    public void setComposition(PAGComposition pagComposition) {
+        WorkThreadExecutor.getInstance().post(() -> super.setComposition(pagComposition));
+    }
+
+    @Override
+    public void setProgress(double progress) {
+        WorkThreadExecutor.getInstance().post(() -> super.setProgress(progress));
+    }
+
+    @Override
     public void release() {
-        super.release();
         animator.removeUpdateListener(animatorUpdateListener);
         animator.removeListener(animatorListenerAdapter);
         if (releaseListener != null) {
             releaseListener.onRelease();
         }
         isRelease = true;
+        WorkThreadExecutor.getInstance().post(super::release);
     }
+
 
     @Override
     public boolean flush() {
         if (isRelease) {
             return false;
         }
-        return super.flush();
+        WorkThreadExecutor.getInstance().post(super::flush);
+        return true;
     }
 
     // 更新PAG渲染
-    private final ValueAnimator.AnimatorUpdateListener animatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
-
-        @Override
-        public void onAnimationUpdate(ValueAnimator animation) {
-            progress = (double) (Float) animation.getAnimatedValue();
-            currentPlayTime = (long) (progress * (double) animator.getDuration());
-            setProgress(progress);
-            flush();
-        }
+    private final ValueAnimator.AnimatorUpdateListener animatorUpdateListener = animation -> {
+        progress = (double) (Float) animation.getAnimatedValue();
+        currentPlayTime = (long) (progress * (double) animator.getDuration());
+        setProgress(progress);
+        flush();
     };
 
     public void setReleaseListener(ReleaseListener releaseListener) {
