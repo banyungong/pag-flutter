@@ -74,42 +74,34 @@ public class FlutterPagPlayer extends PAGPlayer {
     }
 
     @Override
-    public void setComposition(PAGComposition pagComposition) {
-        WorkThreadExecutor.getInstance().post(() -> super.setComposition(pagComposition));
-    }
-
-    @Override
-    public void setProgress(double progress) {
-        WorkThreadExecutor.getInstance().post(() -> super.setProgress(progress));
-    }
-
-    @Override
     public void release() {
+        super.release();
         animator.removeUpdateListener(animatorUpdateListener);
         animator.removeListener(animatorListenerAdapter);
         if (releaseListener != null) {
             releaseListener.onRelease();
         }
         isRelease = true;
-        WorkThreadExecutor.getInstance().post(super::release);
     }
-
 
     @Override
     public boolean flush() {
         if (isRelease) {
             return false;
         }
-        WorkThreadExecutor.getInstance().post(super::flush);
-        return true;
+        return super.flush();
     }
 
     // 更新PAG渲染
-    private final ValueAnimator.AnimatorUpdateListener animatorUpdateListener = animation -> {
-        progress = (double) (Float) animation.getAnimatedValue();
-        currentPlayTime = (long) (progress * (double) animator.getDuration());
-        setProgress(progress);
-        flush();
+    private final ValueAnimator.AnimatorUpdateListener animatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
+
+        @Override
+        public void onAnimationUpdate(ValueAnimator animation) {
+            progress = (double) (Float) animation.getAnimatedValue();
+            currentPlayTime = (long) (progress * (double) animator.getDuration());
+            setProgress(progress);
+            flush();
+        }
     };
 
     public void setReleaseListener(ReleaseListener releaseListener) {
