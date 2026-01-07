@@ -80,7 +80,7 @@ class _MyHomeState extends State<MyHome> {
                 child: PAGView.asset(
                   _pagAsset,
                   repeatCount: PAGView.REPEAT_COUNT_LOOP,
-                  renderMode: PAGRenderMode.platformView,
+                  renderMode: PAGRenderMode.texture,
                   initProgress: 0.25,
                   autoPlay: true,
                   key: assetPagKey,
@@ -137,7 +137,7 @@ class _MyHomeState extends State<MyHome> {
               ),
               PAGView.network(
                 "https://svipwebwx-30096.sz.gfp.tencent-cloud.com/file1647585475981.pag",
-                renderMode: PAGRenderMode.platformView,
+                renderMode: PAGRenderMode.texture,
                 repeatCount: PAGView.REPEAT_COUNT_LOOP,
                 initProgress: 0.25,
                 autoPlay: true,
@@ -190,7 +190,7 @@ class _MyHomeState extends State<MyHome> {
                   child: PAGView.bytes(
                     bytesData,
                     repeatCount: PAGView.REPEAT_COUNT_LOOP,
-                    renderMode: PAGRenderMode.platformView,
+                    renderMode: PAGRenderMode.texture,
                     initProgress: 0.25,
                     autoPlay: true,
                     key: bytesPagKey,
@@ -244,7 +244,7 @@ class _MyHomeState extends State<MyHome> {
                 child: PAGView.asset(
                   _assetError,
                   repeatCount: PAGView.REPEAT_COUNT_LOOP,
-                  renderMode: PAGRenderMode.platformView,
+                  renderMode: PAGRenderMode.texture,
                   initProgress: 0.25,
                   autoPlay: true,
                   defaultBuilder: (context){
@@ -282,7 +282,7 @@ class _MyHomeState extends State<MyHome> {
                           height: 120,
                           child: PAGView.asset(
                             _assetFans,
-                            renderMode: PAGRenderMode.platformView,
+                            renderMode: PAGRenderMode.texture,
                             repeatCount: PAGView.REPEAT_COUNT_LOOP,
                             autoPlay: true,
                           ),

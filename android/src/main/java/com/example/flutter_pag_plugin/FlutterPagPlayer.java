@@ -4,15 +4,9 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.view.animation.LinearInterpolator;
-
-import androidx.annotation.NonNull;
-
-import org.libpag.PAGComposition;
 import org.libpag.PAGFile;
 import org.libpag.PAGPlayer;
-import org.libpag.PAGView;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import io.flutter.plugin.common.MethodChannel;
@@ -93,15 +87,11 @@ public class FlutterPagPlayer extends PAGPlayer {
     }
 
     // 更新PAG渲染
-    private final ValueAnimator.AnimatorUpdateListener animatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
-
-        @Override
-        public void onAnimationUpdate(ValueAnimator animation) {
-            progress = (double) (Float) animation.getAnimatedValue();
-            currentPlayTime = (long) (progress * (double) animator.getDuration());
-            setProgress(progress);
-            flush();
-        }
+    private final ValueAnimator.AnimatorUpdateListener animatorUpdateListener = animation -> {
+        progress = (double) (Float) animation.getAnimatedValue();
+        currentPlayTime = (long) (progress * (double) animator.getDuration());
+        setProgress(progress);
+        flush();
     };
 
     public void setReleaseListener(ReleaseListener releaseListener) {
