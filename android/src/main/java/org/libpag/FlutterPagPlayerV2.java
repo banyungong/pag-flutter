@@ -112,7 +112,6 @@ public class FlutterPagPlayerV2 extends PAGPlayer implements PAGAnimator.Listene
     @Override
     public void onAnimationUpdate(PAGAnimator pagAnimator) {
         //获取当前线程名
-        String threadName = Thread.currentThread().getName();
         progress = pagAnimator.progress();
         currentPlayTime = (long) (progress * (double) animator.duration());
         setProgress(progress);
