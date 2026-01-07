@@ -1,7 +1,6 @@
 package org.libpag;
 
 
-import android.animation.ValueAnimator;
 import android.content.Context;
 
 import com.example.flutter_pag_plugin.FlutterPagPlugin;
@@ -16,7 +15,6 @@ public class FlutterPagPlayerV2 extends PAGPlayer implements PAGAnimator.Listene
 
     private PAGAnimator animator;
     private boolean isRelease;
-    private long currentPlayTime = 0L;
     private double progress = 0;
     private double initProgress = 0;
     private ReleaseListener releaseListener;
@@ -39,7 +37,7 @@ public class FlutterPagPlayerV2 extends PAGPlayer implements PAGAnimator.Listene
         if (repeatCount < 0) {
             repeatCount = 0;
         }
-        animator.setRepeatCount(repeatCount - 1);
+        animator.setRepeatCount(repeatCount);
         setProgressValue(initProgress);
     }
 
@@ -86,22 +84,22 @@ public class FlutterPagPlayerV2 extends PAGPlayer implements PAGAnimator.Listene
 
     @Override
     public void onAnimationStart(PAGAnimator pagAnimator) {
+//        Log.e("FlutterPagPlayerV2", "onAnimationStart name:"+getComposition().layerName());
         notifyEvent(FlutterPagPlugin._eventStart);
     }
 
     @Override
     public void onAnimationEnd(PAGAnimator pagAnimator) {
-        int repeatCount = pagAnimator.repeatCount();
-        if (repeatCount >= 0 && (pagAnimator.duration() > 0) &&
-                (currentPlayTime / pagAnimator.duration() > repeatCount)) {
-            notifyEvent(FlutterPagPlugin._eventEnd);
-        }
+//        Log.e("FlutterPagPlayerV2", "onAnimationEnd name:" +getComposition().layerName());
+//        Log.e("FlutterPagPlayerV2", "onAnimationEnd repeatCount:" + repeatCount);
+//        Log.e("FlutterPagPlayerV2", "onAnimationEnd duration:" + pagAnimator.duration());
+        notifyEvent(FlutterPagPlugin._eventEnd);
+
     }
 
     @Override
     public void onAnimationCancel(PAGAnimator pagAnimator) {
         notifyEvent(FlutterPagPlugin._eventCancel);
-
     }
 
     @Override
@@ -113,7 +111,6 @@ public class FlutterPagPlayerV2 extends PAGPlayer implements PAGAnimator.Listene
     public void onAnimationUpdate(PAGAnimator pagAnimator) {
         //获取当前线程名
         progress = pagAnimator.progress();
-        currentPlayTime = (long) (progress * (double) animator.duration());
         setProgress(progress);
         flush();
     }
