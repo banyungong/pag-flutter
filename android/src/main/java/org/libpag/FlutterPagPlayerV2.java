@@ -99,9 +99,6 @@ public class FlutterPagPlayerV2 extends PAGPlayer implements PAGAnimator.Listene
             return;
         }
         isRelease = true;
-        
-        // 先停止动画器，防止在释放过程中动画回调继续执行
-        // 设置 isRelease = true 后，即使回调还在执行，也会在回调开始处直接返回
         try {
             if (animator != null) {
                 animator.cancel();
@@ -110,7 +107,12 @@ public class FlutterPagPlayerV2 extends PAGPlayer implements PAGAnimator.Listene
         } catch (Exception e) {
             Log.e("FlutterPagPlayerV2", "Error canceling animator in release: " + e.getMessage(), e);
         }
-        
+        // 这样可以避免在释放 PAGSurface 时，PAGPlayer 还在使用它导致的 "Pure virtual function called" 崩溃
+        try {
+            setSurface(null);
+        } catch (Exception e) {
+            Log.e("FlutterPagPlayerV2", "Error setting surface to null in release: " + e.getMessage(), e);
+        }
         super.release();
         if (releaseListener != null) {
             try {

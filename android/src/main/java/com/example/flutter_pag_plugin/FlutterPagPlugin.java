@@ -248,17 +248,13 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
             }
             // 2. 然后释放 Surface（它依赖 SurfaceTexture）
             try {
-                if (surface != null) {
-                    surface.release();
-                }
+                surface.release();
             } catch (Exception e) {
                 android.util.Log.e("FlutterPagPlugin", "Error releasing Surface: " + e.getMessage(), e);
             }
             // 3. 最后释放 SurfaceTextureEntry
             try {
-                if (entry != null) {
-                    entry.release();
-                }
+                entry.release();
             } catch (Exception e) {
                 android.util.Log.e("FlutterPagPlugin", "Error releasing SurfaceTextureEntry: " + e.getMessage(), e);
             }
