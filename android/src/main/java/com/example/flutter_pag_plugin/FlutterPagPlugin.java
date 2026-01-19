@@ -42,7 +42,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     FlutterPlugin.FlutterAssets flutterAssets;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
-    public HashMap<String, FlutterPagPlayerV2> layerMap = new HashMap<>();
+    public HashMap<String, IPagPlayer> layerMap = new HashMap<>();
     public HashMap<String, TextureRegistry.SurfaceTextureEntry> entryMap = new HashMap<>();
 
     // 原生接口
@@ -69,6 +69,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     final static String _argumentPointX = "x";
     final static String _argumentPointY = "y";
     final static String _argumentProgress = "progress";
+    final static String _argumentUsePlayerV2 = "usePlayerV2";
     public final static String _argumentEvent = "PAGEvent";
 
     // 回调
@@ -196,22 +197,71 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         final int repeatCount = call.argument(_argumentRepeatCount);
         final double initProgress = call.argument(_argumentInitProgress);
         final boolean autoPlay = call.argument(_argumentAutoPlay);
+        // 默认使用 FlutterPagPlayerV2，如果参数为 false 则使用 FlutterPagPlayer
+        final Boolean usePlayerV2 = call.argument(_argumentUsePlayerV2);
+        final boolean useV2 = usePlayerV2 == null || usePlayerV2; // 默认 true
 
-        final FlutterPagPlayerV2 pagPlayer = new FlutterPagPlayerV2();
+        // 添加日志输出，确认策略是否生效
+        android.util.Log.i("FlutterPagPlugin", "initPagPlayerAndCallback: usePlayerV2=" + usePlayerV2 
+            + ", useV2=" + useV2 + ", will use " + (useV2 ? "FlutterPagPlayerV2" : "FlutterPagPlayer"));
+
         final TextureRegistry.SurfaceTextureEntry entry = textureRegistry.createSurfaceTexture();
         entryMap.put(String.valueOf(entry.id()), entry);
 
-        pagPlayer.init(context,composition, repeatCount, initProgress, channel, entry.id());
         SurfaceTexture surfaceTexture = entry.surfaceTexture();
         surfaceTexture.setDefaultBufferSize(composition.width(), composition.height());
 
         final Surface surface = new Surface(surfaceTexture);
         final PAGSurface pagSurface = PAGSurface.FromSurface(surface);
-        pagPlayer.setSurface(pagSurface);
+
+        final IPagPlayer pagPlayer;
+        
+        // 根据策略创建对应的 Player 实例
+        if (useV2) {
+            // 使用 FlutterPagPlayerV2
+            android.util.Log.i("FlutterPagPlugin", "Creating FlutterPagPlayerV2 instance");
+            FlutterPagPlayerV2 playerV2 = new FlutterPagPlayerV2();
+            playerV2.init(context, composition, repeatCount, initProgress, channel, entry.id());
+            playerV2.setSurface(pagSurface);
+            pagPlayer = playerV2;
+            android.util.Log.i("FlutterPagPlugin", "FlutterPagPlayerV2 created successfully, textureId=" + entry.id());
+        } else {
+            // 使用 FlutterPagPlayer
+            android.util.Log.i("FlutterPagPlugin", "Creating FlutterPagPlayer instance");
+            FlutterPagPlayer playerV1 = new FlutterPagPlayer();
+            playerV1.init(composition, repeatCount, initProgress, channel, entry.id());
+            playerV1.setSurface(pagSurface);
+            pagPlayer = playerV1;
+            android.util.Log.i("FlutterPagPlugin", "FlutterPagPlayer created successfully, textureId=" + entry.id());
+        }
+
+        // 设置释放监听器
         pagPlayer.setReleaseListener(() -> {
-            entry.release();
-            surface.release();
-            pagSurface.release();
+            // 按照正确的依赖顺序释放：先释放依赖其他资源的对象
+            // 1. 先释放 PAGSurface（它依赖 Surface）
+            try {
+                if (pagSurface != null) {
+                    pagSurface.release();
+                }
+            } catch (Exception e) {
+                android.util.Log.e("FlutterPagPlugin", "Error releasing PAGSurface: " + e.getMessage(), e);
+            }
+            // 2. 然后释放 Surface（它依赖 SurfaceTexture）
+            try {
+                if (surface != null) {
+                    surface.release();
+                }
+            } catch (Exception e) {
+                android.util.Log.e("FlutterPagPlugin", "Error releasing Surface: " + e.getMessage(), e);
+            }
+            // 3. 最后释放 SurfaceTextureEntry
+            try {
+                if (entry != null) {
+                    entry.release();
+                }
+            } catch (Exception e) {
+                android.util.Log.e("FlutterPagPlugin", "Error releasing SurfaceTextureEntry: " + e.getMessage(), e);
+            }
         });
 
         layerMap.put(String.valueOf(entry.id()), pagPlayer);
@@ -229,21 +279,21 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     }
 
     void start(MethodCall call) {
-        FlutterPagPlayerV2 flutterPagPlayer = getFlutterPagPlayer(call);
+        IPagPlayer flutterPagPlayer = getFlutterPagPlayer(call);
         if (flutterPagPlayer != null) {
             flutterPagPlayer.start();
         }
     }
 
     void stop(MethodCall call) {
-        FlutterPagPlayerV2 flutterPagPlayer = getFlutterPagPlayer(call);
+        IPagPlayer flutterPagPlayer = getFlutterPagPlayer(call);
         if (flutterPagPlayer != null) {
             flutterPagPlayer.stop();
         }
     }
 
     void pause(MethodCall call) {
-        FlutterPagPlayerV2 flutterPagPlayer = getFlutterPagPlayer(call);
+        IPagPlayer flutterPagPlayer = getFlutterPagPlayer(call);
         if (flutterPagPlayer != null) {
             flutterPagPlayer.pause();
         }
@@ -251,27 +301,36 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
 
     void setProgress(MethodCall call) {
         double progress = call.argument(_argumentProgress);
-        FlutterPagPlayerV2 flutterPagPlayer = getFlutterPagPlayer(call);
+        IPagPlayer flutterPagPlayer = getFlutterPagPlayer(call);
         if (flutterPagPlayer != null) {
             flutterPagPlayer.setProgressValue(progress);
         }
     }
 
     void release(MethodCall call) {
-        FlutterPagPlayerV2 flutterPagPlayer = layerMap.remove(getTextureId(call));
+        String textureId = getTextureId(call);
+        IPagPlayer flutterPagPlayer = layerMap.remove(textureId);
+        
+        // 从 entryMap 中移除，但不在这里释放
+        // entry 的释放由 releaseListener 统一处理，避免重复释放导致的崩溃
+        entryMap.remove(textureId);
+        
         if (flutterPagPlayer != null) {
-            flutterPagPlayer.stop();
-            flutterPagPlayer.release();
-        }
-
-        TextureRegistry.SurfaceTextureEntry entry = entryMap.remove(getTextureId(call));
-        if (entry != null) {
-            entry.release();
+            // 在主线程上执行释放，确保线程安全
+            handler.post(() -> {
+                try {
+                    flutterPagPlayer.stop();
+                    flutterPagPlayer.release();
+                    // releaseListener 会在 release() 方法中自动释放 entry, surface, pagSurface
+                } catch (Exception e) {
+                    android.util.Log.e("FlutterPagPlugin", "Error releasing FlutterPagPlayer: " + e.getMessage(), e);
+                }
+            });
         }
     }
 
     List<String> getLayersUnderPoint(MethodCall call) {
-        FlutterPagPlayerV2 flutterPagPlayer = getFlutterPagPlayer(call);
+        IPagPlayer flutterPagPlayer = getFlutterPagPlayer(call);
 
         List<String> layerNames = new ArrayList<>();
         PAGLayer[] layers = null;
@@ -289,7 +348,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         return layerNames;
     }
 
-    FlutterPagPlayerV2 getFlutterPagPlayer(MethodCall call) {
+    IPagPlayer getFlutterPagPlayer(MethodCall call) {
         return layerMap.get(getTextureId(call));
     }
 
@@ -299,11 +358,23 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
 
     //插件销毁
     public void onDestroy() {
-        for (FlutterPagPlayerV2 pagPlayer : layerMap.values()) {
-            pagPlayer.release();
+        // 先释放所有的 pagPlayer，releaseListener 会自动释放 entry, surface, pagSurface
+        for (IPagPlayer pagPlayer : layerMap.values()) {
+            try {
+                pagPlayer.stop();
+                pagPlayer.release();
+                // releaseListener 会在 release() 方法中自动释放 entry, surface, pagSurface
+            } catch (Exception e) {
+                android.util.Log.e("FlutterPagPlugin", "Error releasing pagPlayer in onDestroy: " + e.getMessage(), e);
+            }
         }
+        // 清理剩余的 entry（可能有些 entry 没有对应的 pagPlayer，虽然理论上不应该发生）
         for (TextureRegistry.SurfaceTextureEntry entry : entryMap.values()) {
-            entry.release();
+            try {
+                entry.release();
+            } catch (Exception e) {
+                android.util.Log.e("FlutterPagPlugin", "Error releasing entry in onDestroy: " + e.getMessage(), e);
+            }
         }
         layerMap.clear();
         entryMap.clear();

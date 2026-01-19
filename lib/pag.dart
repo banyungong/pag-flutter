@@ -43,6 +43,11 @@ class PAGView extends StatefulWidget {
   /// 循环次数
   final int repeatCount;
 
+  /// 是否使用 FlutterPagPlayerV2（Android 专用）
+  /// true 或 null：使用 FlutterPagPlayerV2（默认）
+  /// false：使用 FlutterPagPlayer
+  final bool? usePlayerV2;
+
   /// 渲染模式 iOS下PlatformView模式不可用
   final PAGRenderMode renderMode;
 
@@ -75,6 +80,7 @@ class PAGView extends StatefulWidget {
     this.initProgress = 0,
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
+    this.usePlayerV2,
     this.onInit,
     this.onAnimationStart,
     this.onAnimationEnd,
@@ -96,6 +102,7 @@ class PAGView extends StatefulWidget {
     this.initProgress = 0,
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
+    this.usePlayerV2,
     this.package,
     this.onInit,
     this.onAnimationStart,
@@ -118,6 +125,7 @@ class PAGView extends StatefulWidget {
     this.initProgress = 0,
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
+    this.usePlayerV2,
     this.package,
     this.onInit,
     this.onAnimationStart,
@@ -139,6 +147,7 @@ class PAGView extends StatefulWidget {
     this.initProgress = 0,
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
+    this.usePlayerV2,
     this.package,
     this.onInit,
     this.onAnimationStart,
@@ -200,6 +209,7 @@ class PAGViewState extends State<PAGView> {
   static const String _argumentPointX = 'x';
   static const String _argumentPointY = 'y';
   static const String _argumentProgress = 'progress';
+  static const String _argumentUsePlayerV2 = 'usePlayerV2';
   static const String _argumentEvent = 'PAGEvent';
 
   // 新增：可见性参数
@@ -254,7 +264,8 @@ class PAGViewState extends State<PAGView> {
         _argumentBytes: widget.bytesData,
         _argumentRepeatCount: repeatCount,
         _argumentInitProgress: initProcess,
-        _argumentAutoPlay: widget.autoPlay
+        _argumentAutoPlay: widget.autoPlay,
+        if (widget.usePlayerV2 != null) _argumentUsePlayerV2: widget.usePlayerV2,
       });
       if (result is Map) {
         _textureId = result[_argumentTextureId];

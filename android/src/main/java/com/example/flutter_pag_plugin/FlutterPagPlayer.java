@@ -12,14 +12,14 @@ import java.util.HashMap;
 import io.flutter.plugin.common.MethodChannel;
 
 
-public class FlutterPagPlayer extends PAGPlayer {
+public class FlutterPagPlayer extends PAGPlayer implements IPagPlayer {
 
     private final ValueAnimator animator = ValueAnimator.ofFloat(0.0F, 1.0F);
     private boolean isRelease;
     private long currentPlayTime = 0L;
     private double progress = 0;
     private double initProgress = 0;
-    private ReleaseListener releaseListener;
+    private IPagPlayer.ReleaseListener releaseListener;
 
     private MethodChannel channel;
     private long textureId;
@@ -94,12 +94,9 @@ public class FlutterPagPlayer extends PAGPlayer {
         flush();
     };
 
-    public void setReleaseListener(ReleaseListener releaseListener) {
+    @Override
+    public void setReleaseListener(IPagPlayer.ReleaseListener releaseListener) {
         this.releaseListener = releaseListener;
-    }
-
-    public interface ReleaseListener {
-        void onRelease();
     }
 
     // 动画状态监听
