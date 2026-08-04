@@ -29,6 +29,8 @@ class PlatformPagView(
     private var methodChannel: MethodChannel? = null
     private var pagFile: PAGFile? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile
+    private var disposed = false
 
     // 常量定义（与主插件保持一致）
     companion object {
@@ -64,7 +66,6 @@ class PlatformPagView(
         const val _eventEnd = "onAnimationEnd"
         const val _eventCancel = "onAnimationCancel"
         const val _eventRepeat = "onAnimationRepeat"
-        const val _eventUpdate = "onAnimationUpdate"
     }
 
     init {
@@ -87,19 +88,39 @@ class PlatformPagView(
     }
 
     override fun dispose() {
-        Log.d("PlatformPagView", "dispose: viewId=$viewId")
-        
-        mainHandler.post {
-            pagView?.pause()
-            pagView?.stop()
-            pagView?.removeListener(this)
-            
-            // 清理PAG文件引用
-            pagFile = null
-            
-            methodChannel?.setMethodCallHandler(null)
-            methodChannel = null
+        synchronized(this) {
+            if (disposed) {
+                return
+            }
+            disposed = true
         }
+        Log.d("PlatformPagView", "dispose: viewId=$viewId")
+
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            releaseNativeView()
+        } else {
+            mainHandler.postAtFrontOfQueue {
+                releaseNativeView()
+            }
+        }
+    }
+
+    private fun releaseNativeView() {
+        mainHandler.removeCallbacksAndMessages(null)
+
+        val view = pagView
+        view?.removeListener(this)
+        view?.pause()
+        view?.stop()
+        if (view != null) {
+            containerView?.removeView(view)
+        }
+
+        pagFile = null
+        pagView = null
+        methodChannel?.setMethodCallHandler(null)
+        methodChannel = null
+        containerView = null
     }
 
     private fun parseCreationParams() {
@@ -142,6 +163,9 @@ class PlatformPagView(
      * 创建PAGView（如果还没有创建的话）
      */
     private fun createPAGViewIfNeeded() {
+        if (disposed) {
+            return
+        }
         if (pagView == null) {
             pagView = PAGView(context)
             pagView?.let { view ->
@@ -163,6 +187,9 @@ class PlatformPagView(
         initProgress: Double,
         autoPlay: Boolean
     ) {
+        if (disposed) {
+            return
+        }
         try {
             val assetPath = if (flutterPackage.isNullOrEmpty()) {
                 "flutter_assets/$assetName"
@@ -184,10 +211,20 @@ class PlatformPagView(
         autoPlay: Boolean
     ) {
         DataLoadHelper.loadPag(url, { bytes ->
-            if (bytes != null) {
-                loadPagFile(PAGFile.Load(bytes), repeatCount, initProgress, autoPlay)
-            } else {
-                Log.e("PlatformPagView", "Failed to load PAG from URL: $url")
+            if (disposed) {
+                return@loadPag
+            }
+
+            val composition = bytes?.let { PAGFile.Load(it) }
+            mainHandler.post {
+                if (disposed) {
+                    return@post
+                }
+                if (composition != null) {
+                    loadPagFile(composition, repeatCount, initProgress, autoPlay)
+                } else {
+                    Log.e("PlatformPagView", "Failed to load PAG from URL: $url")
+                }
             }
         }, DataLoadHelper.FROM_PLUGIN)
     }
@@ -201,6 +238,9 @@ class PlatformPagView(
         initProgress: Double,
         autoPlay: Boolean
     ) {
+        if (disposed) {
+            return
+        }
         if (composition == null) {
             Log.e("PlatformPagView", "PAG composition is null")
             return
@@ -224,6 +264,9 @@ class PlatformPagView(
             
             // 回传尺寸信息给Flutter端
             mainHandler.post {
+                if (disposed) {
+                    return@post
+                }
                 methodChannel?.invokeMethod(
                     "onPAGViewInitialized", mapOf(
                         "width" to composition.width().toDouble(),
@@ -242,6 +285,10 @@ class PlatformPagView(
     }
     
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        if (disposed) {
+            result.success(null)
+            return
+        }
         when (call.method) {
             _nativeStart -> {
                 pagView?.play()
@@ -292,6 +339,10 @@ class PlatformPagView(
      * 处理动态加载PAG文件的方法调用
      */
     private fun loadPagFileFromMethodCall(call: MethodCall, result: MethodChannel.Result) {
+        if (disposed) {
+            result.success(null)
+            return
+        }
         Log.d("PlatformPagView", "loadPagFileFromMethodCall: viewId=$viewId")
 
         val assetName = call.argument<String>(_argumentAssetName)
@@ -334,7 +385,13 @@ class PlatformPagView(
      * 设置PAGView的可见性
      */
     private fun setViewVisibility(visible: Boolean) {
+        if (disposed) {
+            return
+        }
         mainHandler.post {
+            if (disposed) {
+                return@post
+            }
             pagView?.visibility = if (visible) View.VISIBLE else View.INVISIBLE
 //            Log.d("PlatformPagView", "PAGView visibility set to: ${if (visible) "VISIBLE" : "INVISIBLE"} for viewId=$viewId")
         }
@@ -344,7 +401,13 @@ class PlatformPagView(
      * 清空画面 - 停止播放并重置到第一帧或隐藏
      */
     private fun clearFrame() {
+        if (disposed) {
+            return
+        }
         mainHandler.post {
+            if (disposed) {
+                return@post
+            }
             pagView?.let { view ->
                 view.stop()
                 // 重置到第一帧
@@ -356,58 +419,38 @@ class PlatformPagView(
         }
     }
 
-    override fun onAnimationStart(pagView: PAGView?) {
+    private fun sendAnimationEvent(event: String) {
+        if (disposed) {
+            return
+        }
         mainHandler.post {
+            if (disposed) {
+                return@post
+            }
             methodChannel?.invokeMethod(
                 _playCallback, mapOf(
-                    "event" to _eventStart,
+                    "event" to event,
                     "viewId" to viewId
                 )
             )
         }
+    }
+
+    override fun onAnimationStart(pagView: PAGView?) {
+        sendAnimationEvent(_eventStart)
     }
 
     override fun onAnimationEnd(pagView: PAGView?) {
-        mainHandler.post {
-            methodChannel?.invokeMethod(
-                _playCallback, mapOf(
-                    "event" to _eventEnd,
-                    "viewId" to viewId
-                )
-            )
-        }
+        sendAnimationEvent(_eventEnd)
     }
 
     override fun onAnimationCancel(pagView: PAGView?) {
-        mainHandler.post {
-            methodChannel?.invokeMethod(
-                _playCallback, mapOf(
-                    "event" to _eventCancel,
-                    "viewId" to viewId
-                )
-            )
-        }
+        sendAnimationEvent(_eventCancel)
     }
 
     override fun onAnimationRepeat(pagView: PAGView?) {
-        mainHandler.post {
-            methodChannel?.invokeMethod(
-                _playCallback, mapOf(
-                    "event" to _eventRepeat,
-                    "viewId" to viewId
-                )
-            )
-        }
+        sendAnimationEvent(_eventRepeat)
     }
 
-    override fun onAnimationUpdate(pagView: PAGView?) {
-        mainHandler.post {
-            methodChannel?.invokeMethod(
-                _playCallback, mapOf(
-                    "event" to _eventUpdate,
-                    "viewId" to viewId
-                )
-            )
-        }
-    }
+    override fun onAnimationUpdate(pagView: PAGView?) = Unit
 }
