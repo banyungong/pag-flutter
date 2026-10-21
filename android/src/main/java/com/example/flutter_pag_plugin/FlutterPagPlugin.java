@@ -70,6 +70,7 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
     final static String _argumentPointY = "y";
     final static String _argumentProgress = "progress";
     final static String _argumentUsePlayerV2 = "usePlayerV2";
+    final static String _argumentRestoreTextureBinding = "restoreTextureBinding";
     public final static String _argumentEvent = "PAGEvent";
 
     // 回调
@@ -205,7 +206,12 @@ public class FlutterPagPlugin implements FlutterPlugin, MethodCallHandler {
         android.util.Log.i("FlutterPagPlugin", "initPagPlayerAndCallback: usePlayerV2=" + usePlayerV2 
             + ", useV2=" + useV2 + ", will use " + (useV2 ? "FlutterPagPlayerV2" : "FlutterPagPlayer"));
 
-        final TextureRegistry.SurfaceTextureEntry entry = textureRegistry.createSurfaceTexture();
+        // Guard only PAG's consumer texture; never hook FlutterJNI or other plugins' textures.
+        final boolean restoreTextureBinding =
+                !Boolean.FALSE.equals(call.argument(_argumentRestoreTextureBinding));
+        final TextureRegistry.SurfaceTextureEntry entry = restoreTextureBinding
+                ? BindingGuardSurfaceTexture.register(textureRegistry)
+                : textureRegistry.createSurfaceTexture();
         entryMap.put(String.valueOf(entry.id()), entry);
 
         SurfaceTexture surfaceTexture = entry.surfaceTexture();

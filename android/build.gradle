@@ -41,6 +41,7 @@ android {
 
 
 dependencies {
+    testImplementation 'junit:junit:4.13.2'
     implementation "com.tencent.tav:libpag:4.5.84"
     implementation 'com.jakewharton:disklrucache:2.0.2'
     // 暂时注释掉 Epic，使用更简单的方案

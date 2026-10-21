@@ -97,6 +97,16 @@ PAGView.asset(
     },
 ```
 
+### Android 纹理绑定保护
+
+Android Texture 模式默认启用 `restoreTextureBinding: true`：PAG 自有的
+`SurfaceTexture` 在 Flutter 消费帧和接入 GL 上下文后恢复外部纹理绑定，避免影响
+WebView 等其他纹理的绘制。此保护不改变动画尺寸、播放次数或回调，也不替换
+FlutterJNI，不影响其他插件的纹理。iOS 和 PlatformView 模式不受该参数影响。
+
+仅做渲染对照时可以传入 `restoreTextureBinding: false`。参数在创建纹理时生效，
+直接使用 `PAGView` 动态切换该参数时应同时更换 key。
+
 ### 通过key获取state进行主动调用
 ```
   final GlobalKey<PAGViewState> pagKey = GlobalKey<PAGViewState>();

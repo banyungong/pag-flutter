@@ -48,6 +48,13 @@ class PAGView extends StatefulWidget {
   /// false：使用 FlutterPagPlayer
   final bool? usePlayerV2;
 
+  /// Restore Android external-texture bindings after Flutter consumes a PAG frame.
+  ///
+  /// Prevents Skia from sampling PAG content when drawing another texture (for example a WebView).
+  /// Only affects Android texture rendering. Disable only for a controlled rendering comparison.
+  /// Applied at texture creation; use a new key to change it on an existing PAGView.
+  final bool restoreTextureBinding;
+
   /// 渲染模式 iOS下PlatformView模式不可用
   final PAGRenderMode renderMode;
 
@@ -81,6 +88,7 @@ class PAGView extends StatefulWidget {
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
     this.usePlayerV2,
+    this.restoreTextureBinding = true,
     this.onInit,
     this.onAnimationStart,
     this.onAnimationEnd,
@@ -103,6 +111,7 @@ class PAGView extends StatefulWidget {
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
     this.usePlayerV2,
+    this.restoreTextureBinding = true,
     this.package,
     this.onInit,
     this.onAnimationStart,
@@ -126,6 +135,7 @@ class PAGView extends StatefulWidget {
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
     this.usePlayerV2,
+    this.restoreTextureBinding = true,
     this.package,
     this.onInit,
     this.onAnimationStart,
@@ -148,6 +158,7 @@ class PAGView extends StatefulWidget {
     this.autoPlay = false,
     this.renderMode = PAGRenderMode.texture,
     this.usePlayerV2,
+    this.restoreTextureBinding = true,
     this.package,
     this.onInit,
     this.onAnimationStart,
@@ -210,6 +221,7 @@ class PAGViewState extends State<PAGView> {
   static const String _argumentPointY = 'y';
   static const String _argumentProgress = 'progress';
   static const String _argumentUsePlayerV2 = 'usePlayerV2';
+  static const String _argumentRestoreTextureBinding = 'restoreTextureBinding';
   static const String _argumentEvent = 'PAGEvent';
 
   // 新增：可见性参数
@@ -267,6 +279,7 @@ class PAGViewState extends State<PAGView> {
         _argumentRepeatCount: repeatCount,
         _argumentInitProgress: initProcess,
         _argumentAutoPlay: widget.autoPlay,
+        _argumentRestoreTextureBinding: widget.restoreTextureBinding,
         if (widget.usePlayerV2 != null)
           _argumentUsePlayerV2: widget.usePlayerV2,
       });
